@@ -355,9 +355,9 @@ public class TzUtil
     String[]  parts = s.split(":");
     int       hour = to_int(parts[0]);
     int       min = (parts.length > 1 ? to_int(parts[1]) : 0);
-    int       sec = (parts.length > 2 ? to_int(parts[2]) : 0);
+    double    sec = (parts.length > 2 ? to_double(parts[2]) : 0.0);
 
-    if (sec >= 30)
+    if (sec >= 30.0)
       ++min;
 
     return sign * (hour * 60 + min);
@@ -436,9 +436,9 @@ public class TzUtil
             result[4] = to_int(parts[4]); // minute
 
             if (parts.length > 5) {
-              int   sec = to_int(parts[5]); // seconds, to be rounded off.
+              double  sec = to_double(parts[5]); // seconds, to be rounded off.
 
-              if (sec >= 30) {
+              if (sec >= 30.0) {
                 ++result[4];
 
                 if (result[4] == 60) {
@@ -546,6 +546,30 @@ public class TzUtil
       result.insert(0, '-');
 
     return result.toString();
+  }
+
+  public static double to_double(String s)
+  {
+    return to_double(s, 0.0);
+  }
+
+  public static double to_double(String s, double defaultValue)
+  {
+    if (s != null) {
+      s = s.trim();
+
+      if (s.startsWith("+"))
+        s = s.substring(1);
+    }
+    else
+      s = "";
+
+    try {
+      return Double.parseDouble(s);
+    }
+    catch (NumberFormatException e) {
+      return defaultValue;
+    }
   }
 
   public static int to_int(String s)

@@ -10,14 +10,18 @@ some other compilers:
 * DST savings (are clocks turned back an hour, half an hour, etc.) are
   preserved, not just a binary flag indicating DST or no DST.
 * Negative DST is properly handled.
+* Ready to handle fractional seconds in source data, if and when introduced.
 * No problems with being extensible beyond 2037.
 * What I call "calendar rollbacks" -- moments in time where not only is the
   clock turned backward, but the calendar as well, can optionally be
-  eliminated. While less historically accurate, it can very useful in software
-  to avoid situations where a calendar day occurs more than once.
+  eliminated. While less historically accurate, it can be very useful in
+  software to avoid situations where a calendar day occurs more than once.
 * The compiled output preserves the last DST rules in effect (if any) in a
   given time zone so that future DST transitions can be generated without
-  having long lists of explicit transitions taking up room in the output data.
+  having long lists of explicit transitions taking up room in the zone data.
+* Time zone designators such as EST, PDT, WET, LMT, etc., are preserved,
+  but designators such as +03 or -07 are discarded, to be re-generated as
+  needed.
 
 Simply type "make" at a command line prompt while in the top directory to build
 the ctzgenerator.jar JAR file.
@@ -56,6 +60,11 @@ options:
 
 
 The code in the zone-demo directory depends on having node.js
-(https://nodejs.org/) and the Angular CLI (https://cli.angular.io/) installed.
-Having installed these tools, cd into the zone-demo directory and enter "ng
-serve" to run the demo on http://localhost:4200/.
+(https://nodejs.org/), npm (https://www.npmjs.com/) and the Angular CLI
+(https://cli.angular.io/) installed. Having installed these tools, cd into the
+zone-demo directory and enter "ng serve" to run the demo on
+http://localhost:4200/.
+
+This demo can also be found online at: http://skyviewcafe.com/zonedemo/
+An astronomical app using this time zone code data can be found at:
+http://skyviewcafe.com/

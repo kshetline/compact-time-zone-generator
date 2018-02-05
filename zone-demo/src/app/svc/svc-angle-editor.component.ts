@@ -203,7 +203,7 @@ export class SvcAngleEditorComponent extends KsSequenceEditorComponent implement
   }
 
   private updateDigits(): void {
-    let i = this.items;
+    const i = this.items;
     let angle = (_.isNil(this.angle) ? 0 : this.angle);
 
     if (this.signDigit >= 0) {
@@ -252,7 +252,7 @@ export class SvcAngleEditorComponent extends KsSequenceEditorComponent implement
   }
 
   private roll(sign: number): void {
-    let minutes = round(this.angle * 60);
+    const minutes = round(this.angle * 60);
     let change = 0;
     const sel = this.selection;
     const wasNegative = this.isNegative(<string> (this.signDigit >= 0 ? this.items[this.signDigit].value : null));
@@ -299,7 +299,7 @@ export class SvcAngleEditorComponent extends KsSequenceEditorComponent implement
   }
 
   protected digitTyped(charCode: number, key: string): void {
-    let minutes = round(abs(this.angle) * 60);
+    const minutes = round(abs(this.angle) * 60);
     const i = this.items;
     const sel = this.selection;
     // Preserve sign so that negative 0 can be maintained as a state.
