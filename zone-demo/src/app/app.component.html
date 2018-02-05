@@ -1,0 +1,29 @@
+<div class="flex-container main" fxLayout="row">
+  <div class="flex-item">
+    <p>Time Zone 1:<br>{{zoneName0}}</p>
+    <svc-zone-selector [(ngModel)]="zoneName0" [disabled]="disabled[0]"></svc-zone-selector><br>
+    <p [hidden]="!error[0]" class="error">{{error[0]}}</p>
+    <br>
+    <svc-time-editor [(ngModel)]="time" [timeZone]="timeZone0" [viewOnly]="trackTime"></svc-time-editor><br>
+    <br>
+    <br><ks-calendar [(ngModel)]="calendarYMD" [timeZone]="timeZone0" [showDst]="true" [minYear]="minYear" [maxYear]="maxYear"></ks-calendar>
+  </div>
+
+  <div class="flex-item middle-column"><button (click)="setToNow()" [disabled]="trackTime">Now</button><br
+      ><ks-checkbox class="track-time" type="checkbox" binary="true" [(ngModel)]="trackTime" label="Track time"></ks-checkbox><br>
+    <br>
+    <br>
+    <div [ngStyle]="{visibility: (showLongitude ? 'visible' : 'hidden')}">
+      <svc-angle-editor [(ngModel)]="longitude" format="DDD_MM_EW"></svc-angle-editor><br>
+      <span class="small-caption">longitude</span>
+    </div>
+  </div>
+
+  <div class="flex-item">
+    <p>Time Zone 2:<br>{{zoneName1}}</p>
+    <svc-zone-selector [(ngModel)]="zoneName1" [disabled]="disabled[1]"></svc-zone-selector><br>
+    <p [hidden]="!error[1]" class="error">{{error[1]}}</p>
+    <br>
+    <svc-time-editor [(ngModel)]="time" [timeZone]="timeZone1" [viewOnly]="trackTime"></svc-time-editor>
+  </div>
+</div>

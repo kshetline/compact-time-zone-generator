@@ -1,0 +1,21 @@
+body {
+  font-size: 12px;
+  background: #DDDDDD;
+  color: black;
+}
+
+@mixin selectable($state) {
+  -webkit-touch-callout: $state;
+  -webkit-user-select: $state;
+  -khtml-user-select: $state;
+  -moz-user-select: $state;
+  -ms-user-select: $state;
+  user-select: $state;
+}
+
+.small-caption {
+  color: #00C;
+  font-size: 75%;
+  cursor: default;
+  @include selectable(none);
+}

@@ -1,0 +1,22 @@
+// styles applied on :host are applied on the current component, "app" in this case
+:host {
+  display: block;
+}
+
+.main {
+  padding: 1em;
+  font-family: Arial, Helvetica, sans-serif;
+  text-align: center;
+  margin-top: 50px;
+  display: block;
+}
+
+.middle-column {
+  padding-left: 2em;
+  padding-right: 2.5em;
+}
+
+.track-time {
+  margin-top: 0.5em;
+  display: inline-block;
+}

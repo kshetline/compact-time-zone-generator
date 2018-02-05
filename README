@@ -1,0 +1,61 @@
+This tz database parser and compiler produces a compact form of time zone data
+similar to (but not compatible with) that used by Moment Timezone
+(https://momentjs.com/timezone/), well suited for use in JavaScript/TypeScript
+code.
+
+Key differences between this compiled time zone output and that produced by
+some other compilers:
+
+* All offsets from UTC are rounded to full minutes.
+* DST savings (are clocks turned back an hour, half an hour, etc.) are
+  preserved, not just a binary flag indicating DST or no DST.
+* Negative DST is properly handled.
+* No problems with being extensible beyond 2037.
+* What I call "calendar rollbacks" -- moments in time where not only is the
+  clock turned backward, but the calendar as well, can optionally be
+  eliminated. While less historically accurate, it can very useful in software
+  to avoid situations where a calendar day occurs more than once.
+* The compiled output preserves the last DST rules in effect (if any) in a
+  given time zone so that future DST transitions can be generated without
+  having long lists of explicit transitions taking up room in the output data.
+
+Simply type "make" at a command line prompt while in the top directory to build
+the ctzgenerator.jar JAR file.
+
+Usage: java -jar ctzgenerator.jar [options] [output_file_name]
+options:
+        -              Send output to stdout instead of a file.
+        -5, --systemv  Include the SystemV timezones from the systemv file by
+                       uncommenting the commented-out zone descriptions.
+        -f             Filter out Etc/GMTxxxx and other time zones that are
+                       either redundant or covered by options for creating
+                       fixed-offset time zones.
+        -h, --help     Display this help.
+        -J, --json     Output JSON instead of JavaScript.
+        -j             Use Java's built-in java.time time zones as the source
+                       of time zone descriptions instead of IANA source files.
+        -l             <URL or version number, such as "2018c", to parse and
+                        compile>
+                       Default: https://www.iana.org/time-zones/repository/tzdata-latest.tar.gz
+        -q             Display fewer warning messages.
+        -r             Remove "calendar rollbacks" from time zone transitions --
+                       that is, modify time zone data to prevent situations
+                       where the calendar date goes backwards as well as the
+                       hour and/or minute of the day.
+        -s             <zone_id> Zone ID for a single time zone to be rendered.
+        -t             Generate more human-readable transitions table instead
+                       of using the compact notation.
+        -v, --version  Display the version of this tool.
+        -y             <min_year,max_year> Year range for explicit time zone
+                        transitions.
+                       Default: 1900,2050
+        -z             <path_to_zoneinfo_directory> Validate this tool's output
+                       against output from the standard zic tool stored in the
+                       given directory. Validation is done before applying the
+                       -r option.
+
+
+The code in the zone-demo directory depends on having node.js
+(https://nodejs.org/) and the Angular CLI (https://cli.angular.io/) installed.
+Having installed these tools, cd into the zone-demo directory and enter "ng
+serve" to run the demo on http://localhost:4200/.
