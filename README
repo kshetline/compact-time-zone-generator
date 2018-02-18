@@ -6,7 +6,7 @@ code.
 Key differences between this compiled time zone output and that produced by
 some other compilers:
 
-* All offsets from UTC are rounded to full minutes.
+* All offsets from UTC can be optionally rounded to full minutes.
 * DST savings (are clocks turned back an hour, half an hour, etc.) are
   preserved, not just a binary flag indicating DST or no DST.
 * Negative DST is properly handled.
@@ -36,11 +36,12 @@ options:
                        fixed-offset time zones.
         -h, --help     Display this help.
         -J, --json     Output JSON instead of JavaScript.
-        -j             Use Java's built-in java.time time zones as the source
-                       of time zone descriptions instead of IANA source files.
+        -j             Use Java's built-in java.time time zones to supplement
+                       time zone descriptions in the IANA source files.
         -l             <URL or version number, such as "2018c", to parse and
                         compile>
                        Default: https://www.iana.org/time-zones/repository/tzdata-latest.tar.gz
+        -m             Round all zone offsets to whole minutes.
         -q             Display fewer warning messages.
         -r             Remove "calendar rollbacks" from time zone transitions --
                        that is, modify time zone data to prevent situations

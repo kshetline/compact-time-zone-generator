@@ -36,7 +36,7 @@ public class IanaZoneRecord
 
   private static final ZoneOffset   UTC = ZoneOffset.ofHours(0);
 
-  public static IanaZoneRecord parseZoneRecord(String line, StringBuilder zoneId)
+  public static IanaZoneRecord parseZoneRecord(String line, StringBuilder zoneId, boolean roundToMinutes)
   {
     // Unfortunately the use of tabs vs. spaces to delimit these files is wildly inconsistent,
     // so it takes some extra effort to parse correctly.
@@ -67,7 +67,7 @@ public class IanaZoneRecord
     IanaZoneRecord zoneRec = new IanaZoneRecord();
 
     parts = line.split(" ");
-    zoneRec.gmtOffset = parseOffsetTime(parts[0]);
+    zoneRec.gmtOffset = parseOffsetTime(parts[0], roundToMinutes);
     zoneRec.rules = (parts[1].equals("-") ? null : parts[1]);
     zoneRec.format = parts[2];
 
@@ -81,14 +81,14 @@ public class IanaZoneRecord
         sb.append(parts[i]);
       }
 
-      int[]           ymdhmc = parseUntilTime(sb.toString());
-      int             clockType = ymdhmc[5];
-      LocalDateTime   ldt = LocalDateTime.of(ymdhmc[0], ymdhmc[1], ymdhmc[2], min(ymdhmc[3], 23), ymdhmc[4]);
+      int[]           ymdhmsc = parseUntilTime(sb.toString(), roundToMinutes);
+      int             clockType = ymdhmsc[6];
+      LocalDateTime   ldt = LocalDateTime.of(ymdhmsc[0], ymdhmsc[1], ymdhmsc[2], min(ymdhmsc[3], 23), ymdhmsc[4], ymdhmsc[5]);
 
-      if (ymdhmc[3] == 24)
+      if (ymdhmsc[3] == 24)
         ldt = ldt.plus(1, ChronoUnit.HOURS);
 
-      zoneRec.until = ldt.toEpochSecond(UTC) / 60 - (clockType != CLOCK_TYPE_UTC ? zoneRec.gmtOffset : 0);
+      zoneRec.until = ldt.toEpochSecond(UTC) - (clockType != CLOCK_TYPE_UTC ? zoneRec.gmtOffset : 0);
       zoneRec.untilType = clockType;
     }
     else
@@ -102,7 +102,7 @@ public class IanaZoneRecord
     String  s = gmtOffset + ", " + rules + ", " + format;
 
     if (until != MAX_JS_SAFE_INTEGER) {
-      LocalDateTime   ldt = LocalDateTime.ofEpochSecond(until * 60, 0, ZoneOffset.ofTotalSeconds((untilType != CLOCK_TYPE_UTC ? gmtOffset : 0) * 60));
+      LocalDateTime   ldt = LocalDateTime.ofEpochSecond(until, 0, ZoneOffset.ofTotalSeconds(untilType != CLOCK_TYPE_UTC ? gmtOffset : 0));
 
       s += ", " + ldt.format(dateTimeFormat) + (untilType == CLOCK_TYPE_WALL ? "w" : (untilType == CLOCK_TYPE_STD ? "s" : "u"));
     }

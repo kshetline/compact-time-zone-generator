@@ -89,7 +89,7 @@ public class TzRule
     rule.atHour = hmc[0];
     rule.atMinute = hmc[1];
     rule.atType = hmc[2];
-    rule.save = parseOffsetTime(parts[8]);
+    rule.save = parseOffsetTime(parts[8], true);
 
     if (parts.length < 10 || parts[9].equals("-"))
       rule.letters = "";
@@ -101,11 +101,11 @@ public class TzRule
 
   public String toCompactTailRule()
   {
-    return startYear + " " + month + " " + dayOfMonth + " " + dayOfWeek + " " + atHour + ":" + atMinute + " " + atType + " " + save;
+    return startYear + " " + month + " " + dayOfMonth + " " + dayOfWeek + " " + atHour + ":" + atMinute + " " + atType + " " + (save / 60);
   }
 
   public String toString() {
     return name + ": " + startYear + ", " + endYear + "," + month + ", " + dayOfMonth + ", " + dayOfWeek + ", " +
-            atHour + ":" + padLeft(atMinute, '0', 2) + (atType == CLOCK_TYPE_WALL ? "w" : (atType == CLOCK_TYPE_STD ? "s" : "u")) + ", " + save + ", " + letters;
+            atHour + ":" + padLeft(atMinute, '0', 2) + (atType == CLOCK_TYPE_WALL ? "w" : (atType == CLOCK_TYPE_STD ? "s" : "u")) + ", " + (save / 60) + ", " + letters;
   }
 }

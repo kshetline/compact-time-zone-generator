@@ -26,9 +26,9 @@ import static org.shetline.timezones.TzUtil.*;
 
 public class TzTransition implements Cloneable
 {
-  protected long    time; // in minutes from epoch
-  protected int     utcOffset; // minutes, positive eastward from UTC
-  protected int     dstOffset; // minutes
+  protected long    time; // in seconds from epoch
+  protected int     utcOffset; // seconds, positive eastward from UTC
+  protected int     dstOffset; // seconds
   protected String  name;
   protected TzRule  rule = null;
 
@@ -59,7 +59,7 @@ public class TzTransition implements Cloneable
 
   public String formatTime()
   {
-    LocalDateTime   ldt = LocalDateTime.ofEpochSecond(time * 60, 0, ZoneOffset.ofTotalSeconds(utcOffset * 60));
+    LocalDateTime   ldt = LocalDateTime.ofEpochSecond(time, 0, ZoneOffset.ofTotalSeconds(utcOffset));
 
     return ldt.format(dateTimeFormat);
   }

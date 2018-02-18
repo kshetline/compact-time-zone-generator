@@ -64,7 +64,7 @@ public class TzCompiler
       int   dstOffset = 0;
 
       if (zoneRec.rules != null && zoneRec.rules.indexOf(':') >= 0)
-        dstOffset = parseOffsetTime(zoneRec.rules);
+        dstOffset = parseOffsetTime(zoneRec.rules, true);
 
       zpc.utcOffset = zoneRec.gmtOffset;
       zpc.until = zoneRec.until;
@@ -88,7 +88,7 @@ public class TzCompiler
       zpc.lastUntilType = zpc.untilType;
 
       if (zpc.until < MAX_JS_SAFE_INTEGER / 2) {
-        LocalDateTime   ldt = LocalDateTime.ofEpochSecond(zpc.until * 60, 0, ZoneOffset.ofTotalSeconds(zpc.utcOffset * 60));
+        LocalDateTime   ldt = LocalDateTime.ofEpochSecond(zpc.until, 0, ZoneOffset.ofTotalSeconds(zpc.utcOffset));
 
         if (ldt.getYear() > maxYear)
           break;
@@ -108,8 +108,8 @@ public class TzCompiler
     String      firstStdLetters = "?";
     String      fallbackStdLetters = "?";
 
-    ZoneOffset  zoneOffset = ZoneOffset.ofTotalSeconds(zpc.utcOffset * 60);
-    ZoneOffset  lastZoneOffset = ZoneOffset.ofTotalSeconds(zpc.lastUtcOffset * 60);
+    ZoneOffset  zoneOffset = ZoneOffset.ofTotalSeconds(zpc.utcOffset);
+    ZoneOffset  lastZoneOffset = ZoneOffset.ofTotalSeconds(zpc.lastUtcOffset);
     ZoneOffset  utc = ZoneOffset.ofHours(0);
     int         lastDst = 0;
     int         highYear;
@@ -120,7 +120,7 @@ public class TzCompiler
     if (zpc.until >= MAX_JS_SAFE_INTEGER)
       highYear = 9999;
     else
-      highYear = LocalDateTime.ofEpochSecond(zpc.until * 60, 0, zoneOffset).getYear();
+      highYear = LocalDateTime.ofEpochSecond(zpc.until, 0, zoneOffset).getYear();
 
     TzTransitionList  newTransitions = new TzTransitionList();
 
@@ -143,15 +143,15 @@ public class TzCompiler
           if (rule.atHour == 24)
             ldt = ldt.plus(1, ChronoUnit.HOURS);
 
-          long  epochMinute = ldt.toEpochSecond(rule.atType == CLOCK_TYPE_UTC ? utc : zoneOffset) / 60;
-          long  altEpochMinute = ldt.toEpochSecond(rule.atType == CLOCK_TYPE_UTC ? utc : lastZoneOffset) / 60 -
+          long  epochSecond = ldt.toEpochSecond(rule.atType == CLOCK_TYPE_UTC ? utc : zoneOffset);
+          long  altEpochSecond = ldt.toEpochSecond(rule.atType == CLOCK_TYPE_UTC ? utc : lastZoneOffset) -
                   (rule.atType == CLOCK_TYPE_WALL ? lastDst : 0);
 
-          if (altEpochMinute == minTime)
-            epochMinute = minTime;
+          if (altEpochSecond == minTime)
+            epochSecond = minTime;
 
           String        name = createDisplayName(zpc.format, rule.letters, rule.save != 0);
-          TzTransition  tzt = new TzTransition(epochMinute, zpc.utcOffset + rule.save, rule.save, name, rule);
+          TzTransition  tzt = new TzTransition(epochSecond, zpc.utcOffset + rule.save, rule.save, name, rule);
 
           newTransitions.add(tzt);
         }
@@ -178,7 +178,7 @@ public class TzCompiler
       TzRule        lastRule = (i < 1 ? null : newTransitions.get(i - 1).rule);
       long          maxTime = zpc.until - (lastRule != null && zpc.untilType == CLOCK_TYPE_WALL ? lastRule.save : 0);
 
-      int   year = LocalDateTime.ofEpochSecond(tzt.time * 60, 0, utc).getYear();
+      int   year = LocalDateTime.ofEpochSecond(tzt.time, 0, utc).getYear();
 
       if (minTime <= tzt.time && tzt.time < maxTime && minYear <= year && year <= maxYear) {
         if ("?".equals(firstStdLetters) && tzt.dstOffset == 0)

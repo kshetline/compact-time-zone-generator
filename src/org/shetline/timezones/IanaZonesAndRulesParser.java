@@ -34,12 +34,22 @@ public class IanaZonesAndRulesParser
   private Map<String, String>     zoneAliases = new HashMap<>();
   private Map<String, TzRuleSet>  ruleSetMap = new HashMap<>();
 
-  private int     lineNo;
+  private boolean   roundToMinutes = false;
+  private int       lineNo;
 
   public static final String    DEFAULT_URL = "https://www.iana.org/time-zones/repository/tzdata-latest.tar.gz";
   private static final String   URL_TEMPLATE_FOR_VERSION = "https://data.iana.org/time-zones/releases/tzdata{version}.tar.gz";
   private static final String[] TZ_SOURCE_FILES = {"africa", "antarctica", "asia", "australasia", "europe", "northamerica",
                                                    "pacificnew", "southamerica", "backward", "etcetera", "systemv"};
+
+  public IanaZonesAndRulesParser()
+  {
+  }
+
+  public IanaZonesAndRulesParser(boolean roundToMinutes)
+  {
+    this.roundToMinutes = roundToMinutes;
+  }
 
   public String parseFromOnline(boolean includeSystemV) throws IOException, IanaParserException
   {
@@ -178,12 +188,12 @@ public class IanaZonesAndRulesParser
 
         StringBuilder   sb = new StringBuilder();
 
-        zoneRec = IanaZoneRecord.parseZoneRecord(line, sb);
+        zoneRec = IanaZoneRecord.parseZoneRecord(line, sb, roundToMinutes);
         zoneId = sb.toString();
         zone = new IanaZone(zoneId);
       }
       else if (zone != null)
-        zoneRec = IanaZoneRecord.parseZoneRecord(line, null);
+        zoneRec = IanaZoneRecord.parseZoneRecord(line, null, roundToMinutes);
 
       if (zoneRec != null) {
         zone.add(zoneRec);

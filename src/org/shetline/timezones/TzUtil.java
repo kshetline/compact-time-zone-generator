@@ -40,9 +40,8 @@ public class TzUtil
 
   public static final long  MIN_JS_SAFE_INTEGER = -0x1FFFFFFFFFFFFFL;
   public static final long  MAX_JS_SAFE_INTEGER =  0x1FFFFFFFFFFFFFL;
-  public static final int   MINUTE_MSEC = 60000;
 
-  public static final DateTimeFormatter   dateTimeFormat = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm");
+  public static final DateTimeFormatter   dateTimeFormat = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss");
 
   private static final Pattern  clockTypeMarker = Pattern.compile(".+\\d([gsuwz])$", Pattern.CASE_INSENSITIVE);
 
@@ -79,13 +78,22 @@ public class TzUtil
 
   public static String formatOffsetNotation(int offset)
   {
-    int hrs = abs(offset) / 60;
-    int min = abs(offset) % 60;
+    int   sign = (int) Math.signum(offset);
 
-    return (offset < 0 ? "-" : "+") + padLeft(hrs, '0', 2) + padLeft(min, '0', 2);
+    offset = abs(offset);
+
+    int     hrs = offset / 3600;
+    int     min = (offset - hrs * 3600) / 60;
+    int     sec = offset % 60;
+    String  s = (sign < 0 ? "-" : "+") + padLeft(hrs, '0', 2) + padLeft(min, '0', 2);
+
+    if (sec != 0)
+      s += padLeft(sec, '0', 2);
+
+    return s;
   }
 
-  public static long fromBase60(String x)
+  public static long fromBase60(String x, boolean multiplyBy60)
   {
     long  sign = 1;
     long  result = 0;
@@ -96,6 +104,19 @@ public class TzUtil
     }
     else if (x.startsWith("+"))
       x = x.substring(1);
+
+    if (multiplyBy60) {
+      int   pos = x.indexOf('.');
+
+      if (pos >= 0) {
+        if (pos == x.length() - 1)
+          x = x.substring(0, pos) + '0';
+        else
+          x = x.substring(0, pos) + x.charAt(pos + 1);
+      }
+      else
+        x += '0';
+    }
 
     for (int i = 0; i < x.length(); ++i) {
       int   digit = x.charAt(i);
@@ -341,7 +362,13 @@ public class TzUtil
     return result;
   }
 
-  public static int parseOffsetTime(String s)
+  /**
+   * Parse offset time in the form [+/-]hours[:minutes[:seconds]]
+   * @param s Offset time as string
+   * @param roundToMinutes If true, round to whole minutes.
+   * @return Offset time in seconds
+   */
+  public static int parseOffsetTime(String s, boolean roundToMinutes)
   {
     int   sign = 1;
 
@@ -355,12 +382,16 @@ public class TzUtil
     String[]  parts = s.split(":");
     int       hour = to_int(parts[0]);
     int       min = (parts.length > 1 ? to_int(parts[1]) : 0);
-    double    sec = (parts.length > 2 ? to_double(parts[2]) : 0.0);
+    int       sec = (parts.length > 2 ? (int) Math.round(to_double(parts[2])) : 0);
 
-    if (sec >= 30.0)
-      ++min;
+    if (roundToMinutes) {
+      if (sec >= 30)
+        ++min;
 
-    return sign * (hour * 60 + min);
+      sec = 0;
+    }
+
+    return sign * ((hour * 60 + min) * 60 + sec);
   }
 
   public static int parseOffsetNotation(String offset)
@@ -377,23 +408,28 @@ public class TzUtil
     if ("0".equals(offset))
       return 0;
     else if ("1".equals(offset))
-      return sign * 60;
-    else
-      return sign * (60 * to_int(offset.substring(0, 2)) + to_int(offset.substring(2, 4)));
+      return sign * 3600;
+
+    int   seconds = 3600 * to_int(offset.substring(0, 2)) + 60 * to_int(offset.substring(2, 4));
+
+    if (offset.length() == 6)
+      seconds += to_int(offset.substring(4, 6));
+
+    return sign * seconds;
   }
 
-  public static int[] parseUntilTime(String s)
+  public static int[] parseUntilTime(String s, boolean roundToMinutes)
   {
-    int[]     result = new int[] {0, 1, 1, 0, 0, CLOCK_TYPE_WALL};
+    int[]     result = new int[] {0, 1, 1, 0, 0, 0, CLOCK_TYPE_WALL};
     Matcher   matcher = clockTypeMarker.matcher(s);
 
     if (matcher.matches()) {
       char  marker = matcher.group(1).toLowerCase().charAt(0);
 
       if (marker == 's')
-        result[5] = CLOCK_TYPE_STD;
+        result[6] = CLOCK_TYPE_STD;
       else if (marker == 'g' || marker == 'u' || marker == 'z')
-        result[5] = CLOCK_TYPE_UTC;
+        result[6] = CLOCK_TYPE_UTC;
 
       s = right(s, -1);
     }
@@ -436,22 +472,26 @@ public class TzUtil
             result[4] = to_int(parts[4]); // minute
 
             if (parts.length > 5) {
-              double  sec = to_double(parts[5]); // seconds, to be rounded off.
+              int   sec = (int) Math.round(to_double(parts[5])); // seconds
 
-              if (sec >= 30.0) {
-                ++result[4];
+              if (roundToMinutes) {
+                if (sec >= 30) {
+                  ++result[4];
 
-                if (result[4] == 60) {
-                  result[4] = 0;
-                  ++result[3];
+                  if (result[4] == 60) {
+                    result[4] = 0;
+                    ++result[3];
 
-                  if (result[3] == 24) {
-                    // In the rare event we get this far, just round off the seconds instead of rounding up.
-                    result[3] = 23;
-                    result[4] = 59;
+                    if (result[3] == 24) {
+                      // In the rare event we get this far, just round off the seconds instead of rounding up.
+                      result[3] = 23;
+                      result[4] = 59;
+                    }
                   }
                 }
               }
+              else
+                result[5] = Math.min(sec, 59);
             }
           }
         }
@@ -498,6 +538,7 @@ public class TzUtil
 
     int   i = s.length() - 1;
 
+    //noinspection StatementWithEmptyBody
     while (s.charAt(i) <= 32 && --i >= 0) {}
 
     return s.substring(0, i + 1);
@@ -513,7 +554,7 @@ public class TzUtil
       return 0L;
   }
 
-  public static String toBase60(long x)
+  public static String toBase60(long x, boolean divideBy60)
   {
     StringBuilder   result = new StringBuilder();
     long            sign = 1;
@@ -540,12 +581,24 @@ public class TzUtil
 
         x /= 60;
       }
+
+      if (divideBy60) {
+        if (result.length() < 2)
+          result.insert(0, "0.");
+        else
+          result.insert(result.length() - 1, '.');
+      }
     }
 
     if (sign < 0)
       result.insert(0, '-');
 
-    return result.toString();
+    String  s = result.toString();
+
+    if (divideBy60 && s.endsWith(".0"))
+      s = s.substring(0, s.length() - 2);
+
+    return s;
   }
 
   public static double to_double(String s)

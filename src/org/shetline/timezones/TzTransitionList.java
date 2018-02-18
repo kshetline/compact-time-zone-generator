@@ -48,7 +48,23 @@ public class TzTransitionList extends ArrayList<TzTransition>
     this.zoneId = zoneId;
   }
 
-  public static TzTransitionList getTzTransitionListJavaTime(String zoneId, int minYear, int maxYear)
+  private static int conditionallyRoundToMinutes(int seconds, boolean roundToMinutes)
+  {
+    if (roundToMinutes)
+      seconds = div(seconds + 30, 60) * 60;
+
+    return seconds;
+  }
+
+  private static long conditionallyRoundToMinutes(long seconds, boolean roundToMinutes)
+  {
+    if (roundToMinutes)
+      seconds = div(seconds + 30, 60) * 60;
+
+    return seconds;
+  }
+
+  public static TzTransitionList getTzTransitionListJavaTime(String zoneId, int minYear, int maxYear, boolean roundToMinutes)
   {
     ZoneRules zone;
 
@@ -74,40 +90,40 @@ public class TzTransitionList extends ArrayList<TzTransition>
     }
 
     if (zoneTransitions.size() > 0) {
-      offset = div(zoneTransitions.get(0).getOffsetBefore().getTotalSeconds() + 30, 60);
-      dstOffset = (int) zone.getDaylightSavings(zoneTransitions.get(0).getInstant().minus(1, ChronoUnit.MINUTES)).get(ChronoUnit.SECONDS) / 60;
+      offset = conditionallyRoundToMinutes(zoneTransitions.get(0).getOffsetBefore().getTotalSeconds(), roundToMinutes);
+      dstOffset = (int) zone.getDaylightSavings(zoneTransitions.get(0).getInstant().minus(1, ChronoUnit.MINUTES)).get(ChronoUnit.SECONDS);
     }
     else {
       ZonedDateTime   earliest = ZonedDateTime.of(minYear, 1, 1, 0, 0, 0, 0, ZoneId.of(zoneId));
 
-      offset = div(zone.getStandardOffset(earliest.toInstant()).getTotalSeconds() + 30, 60);
-      dstOffset = (int) (zone.getDaylightSavings(earliest.toInstant()).get(ChronoUnit.SECONDS) + 30) / 60;
+      offset = conditionallyRoundToMinutes(zone.getStandardOffset(earliest.toInstant()).getTotalSeconds(), roundToMinutes);
+      dstOffset = (int) zone.getDaylightSavings(earliest.toInstant()).get(ChronoUnit.SECONDS);
     }
 
     transitions.add(new TzTransition(lastSampleTime, offset, dstOffset, (dstOffset == 0 ? stdName : dstName)));
 
     for (ZoneOffsetTransition zoneTransition : zoneTransitions) {
-      long  tTime = div(zoneTransition.getInstant().getEpochSecond() + 30, 60);
+      long  tTime = conditionallyRoundToMinutes(zoneTransition.getInstant().getEpochSecond(), roundToMinutes);
 
-      offset = div(zoneTransition.getOffsetAfter().getTotalSeconds() + 30, 60);
-      dstOffset = (int) zone.getDaylightSavings(zoneTransition.getInstant()).get(ChronoUnit.SECONDS) / 60;
+      offset = conditionallyRoundToMinutes(zoneTransition.getOffsetAfter().getTotalSeconds(), roundToMinutes);
+      dstOffset = (int) zone.getDaylightSavings(zoneTransition.getInstant()).get(ChronoUnit.SECONDS);
       transitions.add(new TzTransition(tTime, offset, dstOffset, (dstOffset == 0 ? stdName : dstName)));
       lastSampleTime = tTime;
     }
 
     if (lastSampleTime != MIN_JS_SAFE_INTEGER) {
-      lastSampleTime += 60 * 12; // Add half a day
+      lastSampleTime += 3600 * 12; // Add half a day
 
-      while (ZonedDateTime.ofInstant(Instant.ofEpochSecond(lastSampleTime * 60), ZoneId.of(zoneId)).getYear() <= maxYear) {
-        ZoneOffsetTransition  zoneTransition = zone.nextTransition(Instant.ofEpochSecond(lastSampleTime * 60));
+      while (ZonedDateTime.ofInstant(Instant.ofEpochSecond(lastSampleTime), ZoneId.of(zoneId)).getYear() <= maxYear) {
+        ZoneOffsetTransition  zoneTransition = zone.nextTransition(Instant.ofEpochSecond(lastSampleTime));
 
         if (zoneTransition == null)
           break;
 
-        long  tTime = div(zoneTransition.getInstant().getEpochSecond() + 30, 60);
+        long  tTime = conditionallyRoundToMinutes(zoneTransition.getInstant().getEpochSecond(), roundToMinutes);
 
-        offset = div(zoneTransition.getOffsetAfter().getTotalSeconds() + 30, 60);
-        dstOffset = (int) zone.getDaylightSavings(zoneTransition.getInstant()).get(ChronoUnit.SECONDS) / 60;
+        offset = conditionallyRoundToMinutes(zoneTransition.getOffsetAfter().getTotalSeconds(), roundToMinutes);
+        dstOffset = (int) zone.getDaylightSavings(zoneTransition.getInstant()).get(ChronoUnit.SECONDS);
         transitions.add(new TzTransition(tTime, offset, dstOffset, (dstOffset == 0 ? stdName : dstName)));
         lastSampleTime = tTime;
       }
@@ -119,7 +135,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
     return transitions;
   }
 
-  public static TzTransitionList getZoneTransitionsFromZoneinfo(String zoneInfoPath, String zoneId)
+  public static TzTransitionList getZoneTransitionsFromZoneinfo(String zoneInfoPath, String zoneId, boolean roundToMinutes)
   {
     // Derived from bsmi.util.ZoneInfo.java, http://bmsi.com/java/ZoneInfo.java, Copyright (C) 1999 Business Management Systems, Inc.
     TzTransitionList  transitions = new TzTransitionList(zoneId);
@@ -171,14 +187,14 @@ public class TzTransitionList extends ArrayList<TzTransition>
       for (int i = 0; i < transitionCount; ++i) {
         int     index = offsetIndices[i];
         long    tTime;
-        int     offset = div(offsets[index] + 30, 60);
-        int     dst = (dsts[index] ? 60 : 0); // Not always accurate to use 60 here, but we're just going to care about 0 vs. non-zero later.
+        int     offset = conditionallyRoundToMinutes(offsets[index], roundToMinutes);
+        int     dst = (dsts[index] ? 3600 : 0); // Not always accurate to use 3600 here, but we're just going to care about 0 vs. non-zero later.
         String  name = names[index];
 
         if (times[i] == Integer.MIN_VALUE)
           tTime = MIN_JS_SAFE_INTEGER;
         else
-          tTime = div(times[i] + 30, 60);
+          tTime = conditionallyRoundToMinutes(times[i], roundToMinutes);
 
         if (name.startsWith("+") || name.startsWith("-"))
           name = null;
@@ -215,8 +231,8 @@ public class TzTransitionList extends ArrayList<TzTransition>
         String  offset = offsets[i];
 
         parts = offset.split("/");
-        utcOffsets[i] = (int) fromBase60(parts[0]);
-        dstOffsets[i] = (int) fromBase60(parts[1]);
+        utcOffsets[i] = (int) fromBase60(parts[0], true);
+        dstOffsets[i] = (int) fromBase60(parts[1], true);
 
         if (parts.length > 2)
           names[i] = parts[2];
@@ -232,8 +248,8 @@ public class TzTransitionList extends ArrayList<TzTransition>
         long      lastTTime = 0;
 
         for (int i = 0; i < offsetIndices.length(); ++i) {
-          int   offsetIndex = (int) fromBase60(offsetIndices.substring(i, i + 1));
-          long  tTime = lastTTime + fromBase60(transitionTimes[i]);
+          int   offsetIndex = (int) fromBase60(offsetIndices.substring(i, i + 1), false);
+          long  tTime = lastTTime + fromBase60(transitionTimes[i], true);
 
           tzt = new TzTransition(tTime, utcOffsets[offsetIndex], dstOffsets[offsetIndex], names[offsetIndex]);
           transitions.add(tzt);
@@ -267,21 +283,21 @@ public class TzTransitionList extends ArrayList<TzTransition>
     for (int i = 1; i < size(); ++i) {
       TzTransition    prev = get(i - 1);
       TzTransition    curr = get(i);
-      LocalDateTime   before = LocalDateTime.ofEpochSecond((curr.time - 1) * 60, 0, ZoneOffset.ofTotalSeconds(prev.utcOffset * 60));
+      LocalDateTime   before = LocalDateTime.ofEpochSecond(curr.time - 1, 0, ZoneOffset.ofTotalSeconds(prev.utcOffset));
       LocalDate       beforeDate = before.toLocalDate();
-      LocalDateTime   after = LocalDateTime.ofEpochSecond(curr.time * 60, 0, ZoneOffset.ofTotalSeconds(curr.utcOffset * 60));
+      LocalDateTime   after = LocalDateTime.ofEpochSecond(curr.time, 0, ZoneOffset.ofTotalSeconds(curr.utcOffset));
       LocalDate       afterDate = after.toLocalDate();
 
       if (afterDate.compareTo(beforeDate) < 0) {
         hasRollbacks = true;
 
-        LocalDateTime   turnbackTime = LocalDateTime.ofEpochSecond(curr.time * 60, 0, ZoneOffset.ofTotalSeconds(prev.utcOffset * 60));
+        LocalDateTime   turnbackTime = LocalDateTime.ofEpochSecond(curr.time, 0, ZoneOffset.ofTotalSeconds(prev.utcOffset));
         LocalDateTime   midnight = LocalDateTime.of(turnbackTime.getYear(), turnbackTime.getMonth(), turnbackTime.getDayOfMonth(), 0, 0);
-        int             forayIntoNextDay = (int) midnight.until(turnbackTime, ChronoUnit.MINUTES);
+        int             forayIntoNextDay = (int) midnight.until(turnbackTime, ChronoUnit.SECONDS);
 
         if (showWarnings && !warningShown) {
           System.out.print("* Warning -- " + zoneId + ": " + before.format(dateTimeFormat) + " rolls back to " + after.format(dateTimeFormat) +
-            " (" + forayIntoNextDay + " minute foray into next day)");
+            " (" + (forayIntoNextDay / 60.0) + " minute foray into next day)");
           warningShown = true;
         }
 
@@ -337,7 +353,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
         if (tzt.time == MIN_JS_SAFE_INTEGER)
           continue;
 
-        LocalDateTime   ldt = LocalDateTime.ofEpochSecond((tzt.time + 1) * 60, 0, ZoneOffset.ofTotalSeconds(tzt.utcOffset * 60));
+        LocalDateTime   ldt = LocalDateTime.ofEpochSecond(tzt.time + 1, 0, ZoneOffset.ofTotalSeconds(tzt.utcOffset));
 
         if (ldt.getYear() >= minYear)
           break;
@@ -358,7 +374,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
       if (tzt.time == MIN_JS_SAFE_INTEGER)
         continue;
 
-      LocalDateTime   ldt = LocalDateTime.ofInstant(Instant.ofEpochSecond(tzt.time * 60 + tzt.utcOffset), ZoneId.of("UTC"));
+      LocalDateTime   ldt = LocalDateTime.ofInstant(Instant.ofEpochSecond(tzt.time + tzt.utcOffset), ZoneId.of("UTC"));
 
       if (tzt.dstOffset != 0 || ldt.getYear() > maxYear)
         remove(i);
@@ -401,11 +417,11 @@ public class TzTransitionList extends ArrayList<TzTransition>
             lastTransitionTime = transition.getInstant();
 
             needStdOffset = false;
-            nominalStdOffset = zone.getStandardOffset(lastTransitionTime).getTotalSeconds() / 60;
+            nominalStdOffset = zone.getStandardOffset(lastTransitionTime).getTotalSeconds();
 
             if (zone.isDaylightSavings(lastTransitionTime)) {
               needDstOffset = false;
-              nominalDstOffset = zone.getOffset(lastTransitionTime).getTotalSeconds() / 60 - nominalStdOffset;
+              nominalDstOffset = zone.getOffset(lastTransitionTime).getTotalSeconds() - nominalStdOffset;
             }
           }
           else
@@ -417,9 +433,9 @@ public class TzTransitionList extends ArrayList<TzTransition>
         TimeZone  oldStyleZone = TimeZone.getTimeZone(zoneId);
 
         if (needStdOffset)
-          nominalStdOffset = div(oldStyleZone.getRawOffset(), MINUTE_MSEC);
+          nominalStdOffset = div(oldStyleZone.getRawOffset(), 1000);
 
-        nominalDstOffset = oldStyleZone.getDSTSavings() / MINUTE_MSEC;
+        nominalDstOffset = oldStyleZone.getDSTSavings() / 1000;
       }
     }
     else {
@@ -470,13 +486,13 @@ public class TzTransitionList extends ArrayList<TzTransition>
     }
 
     sb.append(formatOffsetNotation(baseOffset)).append(' ').append(formatOffsetNotation(nominalStdOffset))
-      .append(' ').append(nominalDstOffset).append(';');
+      .append(' ').append(nominalDstOffset / 60).append(';');
 
     List<String>  uniqueOffsetList = new ArrayList<>();
     List<String>  offsetList = new ArrayList<>();
 
     for (TzTransition t : this) {
-      String  offset = toBase60(t.utcOffset) + "/" + toBase60(t.dstOffset);
+      String  offset = toBase60(t.utcOffset, true) + "/" + toBase60(t.dstOffset, true);
 
       if (t.name != null && t.name.length() != 0)
         offset += "/" + t.name;
@@ -494,7 +510,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
     sb.append(';');
 
     for (int i = 1; i < size(); ++i)
-      sb.append(toBase60(uniqueOffsetList.indexOf(offsetList.get(i))));
+      sb.append(toBase60(uniqueOffsetList.indexOf(offsetList.get(i)), false));
 
     sb.append(';');
 
@@ -503,7 +519,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
     for (int i = 1; i < size(); ++i) {
       TzTransition  t = get(i);
 
-      sb.append(toBase60(t.time - lastTime)).append(' ');
+      sb.append(toBase60(t.time - lastTime, true)).append(' ');
       lastTime = t.time;
     }
 
@@ -521,7 +537,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
           fallBackAmount *= -1;
         }
 
-        int   turnbackTime = fallBackRule.atHour * 60 + fallBackRule.atMinute;
+        int   turnbackTime = (fallBackRule.atHour * 60 + fallBackRule.atMinute) * 60;
 
         if (fallBackRule.atType == CLOCK_TYPE_UTC)
           turnbackTime += nominalStdOffset + aheadRule.save;
@@ -554,7 +570,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
     return copy;
   }
 
-  public boolean closelyMatchesJavaTransitions(TzTransitionList fromJava)
+  public boolean closelyMatchesJavaTransitions(TzTransitionList fromJava, boolean roundToMinutes)
   {
     // Java transition list is likely shorter since it is trimmed off before 1900, and it doesn't
     // contain some transitions like name-only changes. It is possible for Java to have a transition
@@ -590,9 +606,11 @@ public class TzTransitionList extends ArrayList<TzTransition>
         continue;
       }
 
-      // Allow for slightly different rounding off of seconds to minutes.
-      if (abs(t.time - tj.time) > 1 ||
-          abs(t.utcOffset      - tj.utcOffset) > 1 ||
+      // If rounding to minutes, allow for rounding to be to result in a one-minute difference.
+      int   roundingAllowance = (roundToMinutes ? 60 : 0);
+
+      if (abs(t.time - tj.time) > roundingAllowance ||
+          abs(t.utcOffset      - tj.utcOffset) > roundingAllowance ||
               t.dstOffset     != tj.dstOffset)
       {
         System.err.println("index: " + i);
@@ -607,7 +625,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
     return true;
   }
 
-  public boolean closelyMatchesZoneinfoTransitions(TzTransitionList fromZoneinfo)
+  public boolean closelyMatchesZoneinfoTransitions(TzTransitionList fromZoneinfo, boolean roundToMinutes)
   {
     // ZoneInfo transition list might include transitions missing from our compiled transitions because
     // they're below our one-minute resolution.
@@ -630,9 +648,11 @@ public class TzTransitionList extends ArrayList<TzTransition>
         continue;
       }
 
-      // Allow for slightly different rounding off of seconds to minutes.
-      if (abs(t.time - tzi.time) > 1 ||
-          abs(t.utcOffset         - tzi.utcOffset) > 1 ||
+      // If rounding to minutes, allow for rounding to be to result in a one-minute difference.
+      int   roundingAllowance = (roundToMinutes ? 60 : 0);
+
+      if (abs(t.time      - tzi.time) > roundingAllowance ||
+          abs(t.utcOffset - tzi.utcOffset) > roundingAllowance ||
               (t.dstOffset == 0) != (tzi.dstOffset == 0) ||
               !equal(t.name, tzi.name))
       {
@@ -698,17 +718,17 @@ public class TzTransitionList extends ArrayList<TzTransition>
     else {
       TzTransition  tzt = get(0);
 
-      out.println("____-__-__ __:__ ±____ ±____ --> ____-__-__ __:__ " +
+      out.println("____-__-__ __:__:__ ±____ ±____ --> ____-__-__ __:__:__ " +
                   formatOffsetNotation(tzt.utcOffset) + " " + formatOffsetNotation(tzt.dstOffset) +
                   (tzt.name != null ? " " + tzt.name : ""));
 
       for (int i = 1; i < size(); ++i) {
         TzTransition    prev = get(i - 1);
-        ZoneOffset      prevOffset = ZoneOffset.ofTotalSeconds(prev.utcOffset * 60);
+        ZoneOffset      prevOffset = ZoneOffset.ofTotalSeconds(prev.utcOffset);
         TzTransition    curr = get(i);
-        ZoneOffset      currOffset = ZoneOffset.ofTotalSeconds(curr.utcOffset * 60);
-        LocalDateTime   prevDateTime = LocalDateTime.ofEpochSecond((curr.time - 1) * 60, 0, prevOffset);
-        LocalDateTime   currDateTime = LocalDateTime.ofEpochSecond(curr.time * 60, 0, currOffset);
+        ZoneOffset      currOffset = ZoneOffset.ofTotalSeconds(curr.utcOffset);
+        LocalDateTime   prevDateTime = LocalDateTime.ofEpochSecond(curr.time - 1, 0, prevOffset);
+        LocalDateTime   currDateTime = LocalDateTime.ofEpochSecond(curr.time, 0, currOffset);
 
         out.println(prevDateTime.format(dateTimeFormat) + " " + formatOffsetNotation(prev.utcOffset) + " " + formatOffsetNotation(prev.dstOffset) + " --> " +
                     currDateTime.format(dateTimeFormat) + " " + formatOffsetNotation(curr.utcOffset) + " " + formatOffsetNotation(curr.dstOffset) +

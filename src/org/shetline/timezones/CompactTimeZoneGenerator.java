@@ -56,16 +56,17 @@ public class CompactTimeZoneGenerator
     int           minYear = DEFAULT_MIN_YEAR;
     int           maxYear = DEFAULT_MAX_YEAR;
     boolean       filtered = false;
-    boolean       getFromJava = false;
+    boolean       supplementFromJava = false;
     boolean       json = false;
     boolean       showWarnings = true;
     boolean       fixCalendarRollbacks = false;
     boolean       toStdOut = false;
     boolean       showTable = false;
     boolean       includeSystemV = false;
+    boolean       roundToMinutes = false;
     String        outFileName = null;
     String        zoneInfoPath = null;
-    final String  simpleFlags = "5fhJjqrtv";
+    final String  simpleFlags = "5fhJjmqrtv";
 
     for (int i = 0; i < args.length; ++i) {
       String    arg = args[i];
@@ -110,10 +111,11 @@ public class CompactTimeZoneGenerator
         System.out.println("                       or covered by options for creating fixed-offset time zones.");
         System.out.println("        -h, --help     Display this help.");
         System.out.println("        -J, --json     Output JSON instead of JavaScript.");
-        System.out.println("        -j             Use Java's built-in java.time time zones as the source of time zone");
-        System.out.println("                       descriptions instead of IANA source files.");
+        System.out.println("        -j             Use Java's built-in java.time time zones to supplement time zone");
+        System.out.println("                       descriptions in the IANA source files.");
         System.out.println("        -l             <URL or version number, such as \"2018c\", to parse and compile>");
         System.out.println("                       Default: " + IanaZonesAndRulesParser.DEFAULT_URL);
+        System.out.println("        -m             Round all zone offsets to whole minutes.");
         System.out.println("        -q             Display fewer warning messages.");
         System.out.println("        -r             Remove \"calendar rollbacks\" from time zone transitions -- that is,");
         System.out.println("                       modify time zone data to prevent situations where the calendar date");
@@ -132,7 +134,9 @@ public class CompactTimeZoneGenerator
       else if ("-J".equals(arg) || "--json".equals(arg))
         json = true;
       else if ("-j".equals(arg))
-        getFromJava = true;
+        supplementFromJava = true;
+      else if ("-m".equals(arg))
+        roundToMinutes = true;
       else if ("-q".equals(arg))
         showWarnings = false;
       else if ("-r".equals(arg))
@@ -154,44 +158,40 @@ public class CompactTimeZoneGenerator
     if (outFileName == null)
       outFileName = (showTable ? DEFAULT_TEXT_OUTPUT_FILE : (json ? DEFAULT_JSON_OUTPUT_FILE : DEFAULT_JS_OUTPUT_FILE));
 
-    IanaZonesAndRulesParser         parser = null;
-    Map<String, TzTransitionList>   compiledZones = null;
+    IanaZonesAndRulesParser         parser = new IanaZonesAndRulesParser(roundToMinutes);
+    Map<String, TzTransitionList>   compiledZones;
 
-    if (!getFromJava) {
-      parser = new IanaZonesAndRulesParser();
+    try {
+      tzVersion = parser.parseFromOnline(urlOrVersion, includeSystemV);
+    }
+    catch (IOException e) {
+      System.err.println(e.getMessage());
+    }
+    catch (IanaParserException e) {
+      System.err.print(e.getMessage());
 
-      try {
-        tzVersion = parser.parseFromOnline(urlOrVersion, includeSystemV);
-      }
-      catch (IOException e) {
-        System.err.println(e.getMessage());
-      }
-      catch (IanaParserException e) {
-        System.err.print(e.getMessage());
+      if (e.getSource() != null)
+        System.err.print(" (" + e.getSource() + ")");
 
-        if (e.getSource() != null)
-          System.err.print(" (" + e.getSource() + ")");
+      if (e.getLineNo() != 0)
+        System.err.print(" (line " + e.getLineNo() + ")");
 
-        if (e.getLineNo() != 0)
-          System.err.print(" (line " + e.getLineNo() + ")");
-
-        System.err.println();
-        System.exit(-1);
-      }
-
-      System.out.println("Compiling time zones");
-
-      TzCompiler  compiler = new TzCompiler(parser);
-
-      compiledZones = compiler.compileAll(minYear, maxYear);
+      System.err.println();
+      System.exit(-1);
     }
 
+    System.out.println("Compiling time zones");
+
+    TzCompiler  compiler = new TzCompiler(parser);
+
+    compiledZones = compiler.compileAll(minYear, maxYear);
+
     List<String>  savedZones = new ArrayList<>();
-    Set<String>   zones = ZoneRulesProvider.getAvailableZoneIds();
+    Set<String>   zones = new HashSet<>(parser.getZoneIds());
 
     // Merge collection of time zones IDs known to Java with those parsed from the tz database.
-    if (parser != null)
-      zones.addAll(parser.getZoneIds());
+    if (supplementFromJava)
+      zones.addAll(ZoneRulesProvider.getAvailableZoneIds());
 
     for (String zoneId : zones) {
       if (filtered && skippedZones.matcher(zoneId).matches())
@@ -236,40 +236,42 @@ public class CompactTimeZoneGenerator
     Map<String, String>   duplicates = new HashMap<>();
 
     System.out.println("Creating compact transition tables " +
-                       (zoneInfoPath != null && !getFromJava ? "/ validating with ZoneInfo " : "") +
+                       (zoneInfoPath != null ? "/ validating with ZoneInfo " : "") +
                        "/ checking for calendar rollbacks");
 
     List<String>  validatedWithJava = new ArrayList<>();
 
     for (String zoneId : savedZones) {
       TzTransitionList  transitions = (compiledZones != null ? compiledZones.get(zoneId) : null);
+      boolean           fromJava = false;
 
       if (transitions == null) {
-        if (showWarnings && !getFromJava)
+        if (showWarnings && supplementFromJava)
           System.out.println("* Warning: " + zoneId + " will be obtained from Java");
 
-        transitions = TzTransitionList.getTzTransitionListJavaTime(zoneId, minYear, maxYear);
+        transitions = TzTransitionList.getTzTransitionListJavaTime(zoneId, minYear, maxYear, roundToMinutes);
+        fromJava = true;
       }
 
-      if (zoneInfoPath != null && !getFromJava) {
-        TzTransitionList  zoneinfoTransitions = TzTransitionList.getZoneTransitionsFromZoneinfo(zoneInfoPath, zoneId);
+      if (zoneInfoPath != null && !fromJava) {
+        TzTransitionList  zoneinfoTransitions = TzTransitionList.getZoneTransitionsFromZoneinfo(zoneInfoPath, zoneId, roundToMinutes);
 
         if (zoneinfoTransitions == null) {
-          TzTransitionList  javaTransitions = TzTransitionList.getTzTransitionListJavaTime(zoneId, minYear, maxYear);
+          TzTransitionList  javaTransitions = TzTransitionList.getTzTransitionListJavaTime(zoneId, minYear, maxYear, roundToMinutes);
 
           if (javaTransitions == null)
             System.out.println("* Warning: " + zoneId + " could not be read from zoneinfo directory for validation");
           else {
             validatedWithJava.add(zoneId);
 
-            if (!transitions.closelyMatchesJavaTransitions(javaTransitions))
+            if (!transitions.closelyMatchesJavaTransitions(javaTransitions, roundToMinutes))
               System.err.println("*** Compiled " + zoneId + " does not match java.time version");
           }
         }
         else {
           zoneinfoTransitions.trim(minYear, maxYear);
 
-          if (!transitions.closelyMatchesZoneinfoTransitions(zoneinfoTransitions))
+          if (!transitions.closelyMatchesZoneinfoTransitions(zoneinfoTransitions, roundToMinutes))
             System.err.println("*** Compiled " + zoneId + " does not match ZoneInfo version");
         }
       }
@@ -296,7 +298,9 @@ public class CompactTimeZoneGenerator
 
     Collections.sort(duplicateZones);
 
-    System.out.println(zones.size() + " time zone IDs, filtered down to " + savedZones.size() + ", " + unique + " unique");
+    System.out.println(zones.size() + " time zone IDs, " +
+                       (savedZones.size() < zones.size() ? "filtered down to " + savedZones.size() + ", " : "") +
+                       unique + " unique");
 
     List<String>  uniqueZones = new ArrayList<>(compactTablesByZone.keySet());
 
@@ -333,7 +337,10 @@ public class CompactTimeZoneGenerator
       }
       else {
         String  quote = (json ? "\"" : "'");
-        String  comment = "tz database version: " + tzVersion + ", years " + minYear + "-" + maxYear + ", rounded to nearest minute";
+        String  comment = "tz database version: " + tzVersion + ", years " + minYear + "-" + maxYear;
+
+        if (roundToMinutes)
+          comment += ", rounded to nearest minute";
 
         if (filtered)
           comment += ", filtered";
