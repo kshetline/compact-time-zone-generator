@@ -158,7 +158,7 @@ public class CompactTimeZoneGenerator
     if (outFileName == null)
       outFileName = (showTable ? DEFAULT_TEXT_OUTPUT_FILE : (json ? DEFAULT_JSON_OUTPUT_FILE : DEFAULT_JS_OUTPUT_FILE));
 
-    IanaZonesAndRulesParser         parser = new IanaZonesAndRulesParser(roundToMinutes);
+    IanaZonesAndRulesParser         parser = new IanaZonesAndRulesParser(roundToMinutes, true);
     Map<String, TzTransitionList>   compiledZones;
 
     try {
@@ -235,9 +235,9 @@ public class CompactTimeZoneGenerator
     int                   unique = savedZones.size();
     Map<String, String>   duplicates = new HashMap<>();
 
-    System.out.println("Creating compact transition tables " +
-                       (zoneInfoPath != null ? "/ validating with ZoneInfo " : "") +
-                       "/ checking for calendar rollbacks");
+    System.out.println("Creating compact transition tables" +
+                       (zoneInfoPath != null ? " / validating with ZoneInfo" : "") +
+                       (showWarnings || fixCalendarRollbacks ? " / checking for calendar rollbacks" : ""));
 
     List<String>  validatedWithJava = new ArrayList<>();
 
@@ -276,7 +276,9 @@ public class CompactTimeZoneGenerator
         }
       }
 
-      transitions.findCalendarRollbacks(fixCalendarRollbacks, showWarnings);
+      if ((showWarnings || fixCalendarRollbacks) &&
+          transitions.findCalendarRollbacks(fixCalendarRollbacks, showWarnings) == TzTransitionList.Rollbacks.ROLLBACKS_REMAIN)
+        System.err.println("*** Failed to fix calendar rollbacks in " + zoneId);
 
       String  ctt = transitions.createCompactTransitionTable(fixCalendarRollbacks);
 
@@ -330,7 +332,7 @@ public class CompactTimeZoneGenerator
 
           TzTransitionList  transitions = transitionsByZone.get(zoneId);
 
-          transitions.dump(out);
+          transitions.dump(out, roundToMinutes);
           out.println();
           out.println();
         }

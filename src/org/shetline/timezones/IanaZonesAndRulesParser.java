@@ -35,6 +35,7 @@ public class IanaZonesAndRulesParser
   private Map<String, TzRuleSet>  ruleSetMap = new HashMap<>();
 
   private boolean   roundToMinutes = false;
+  private boolean   printProgress = false;
   private int       lineNo;
 
   public static final String    DEFAULT_URL = "https://www.iana.org/time-zones/repository/tzdata-latest.tar.gz";
@@ -46,9 +47,10 @@ public class IanaZonesAndRulesParser
   {
   }
 
-  public IanaZonesAndRulesParser(boolean roundToMinutes)
+  public IanaZonesAndRulesParser(boolean roundToMinutes, boolean printProgress)
   {
     this.roundToMinutes = roundToMinutes;
+    this.printProgress = printProgress;
   }
 
   public String parseFromOnline(boolean includeSystemV) throws IOException, IanaParserException
@@ -92,7 +94,9 @@ public class IanaZonesAndRulesParser
 
         if ("version".equals(sourceName)) {
           tzVersion = new String(fileContent, "UTF-8").trim();
-          System.out.println("tz database version: " + tzVersion);
+
+          if (printProgress)
+            System.out.println("tz database version: " + tzVersion);
         }
         else {
           // Uncomment the commented-out time zones in the systemv file
@@ -103,13 +107,17 @@ public class IanaZonesAndRulesParser
             fileContent = stringContent.getBytes("UTF-8");
           }
 
-          System.out.println("Extracting " + sourceName);
+          if (printProgress)
+            System.out.println("Extracting " + sourceName);
+
           sources.put(sourceName, new ByteArrayInputStream(fileContent));
         }
       }
     }
 
-    System.out.println("Parsing tz database sources");
+    if (printProgress)
+      System.out.println("Parsing tz database sources");
+
     parseSources(TZ_SOURCE_FILES, sources);
 
     return tzVersion;

@@ -37,7 +37,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
   private boolean         fromJava = false;
 
   private static final Pattern  systemV = Pattern.compile("SystemV/(\\w\\w\\w)\\d(\\w\\w\\w)");
-  private static final int      ZONE_MATCHING_TOLERANCE = 60 * 24 * 30 * 3; // Three months, in minutes.
+  private static final int      ZONE_MATCHING_TOLERANCE = 3600 * 24 * 30 * 3; // Three months, in seconds.
 
   public TzTransitionList()
   {
@@ -231,8 +231,8 @@ public class TzTransitionList extends ArrayList<TzTransition>
         String  offset = offsets[i];
 
         parts = offset.split("/");
-        utcOffsets[i] = (int) fromBase60(parts[0], true);
-        dstOffsets[i] = (int) fromBase60(parts[1], true);
+        utcOffsets[i] = (int) Math.round(fromBase60(parts[0]) * 60);
+        dstOffsets[i] = (int) Math.round(fromBase60(parts[1]) * 60);
 
         if (parts.length > 2)
           names[i] = parts[2];
@@ -248,8 +248,8 @@ public class TzTransitionList extends ArrayList<TzTransition>
         long      lastTTime = 0;
 
         for (int i = 0; i < offsetIndices.length(); ++i) {
-          int   offsetIndex = (int) fromBase60(offsetIndices.substring(i, i + 1), false);
-          long  tTime = lastTTime + fromBase60(transitionTimes[i], true);
+          int   offsetIndex = (int) fromBase60(offsetIndices.substring(i, i + 1));
+          long  tTime = lastTTime + Math.round(fromBase60(transitionTimes[i]) * 60);
 
           tzt = new TzTransition(tTime, utcOffsets[offsetIndex], dstOffsets[offsetIndex], names[offsetIndex]);
           transitions.add(tzt);
@@ -275,7 +275,9 @@ public class TzTransitionList extends ArrayList<TzTransition>
     this.lastZoneRec = lastZoneRec;
   }
 
-  public boolean findCalendarRollbacks(boolean fixRollbacks, boolean showWarnings)
+  public enum Rollbacks {NO_ROLLBACKS, ROLLBACKS_FOUND, ROLLBACKS_REMOVED, ROLLBACKS_REMAIN }
+
+  public Rollbacks findCalendarRollbacks(boolean fixRollbacks, boolean showWarnings)
   {
     boolean   hasRollbacks = false;
     boolean   warningShown = false;
@@ -296,8 +298,10 @@ public class TzTransitionList extends ArrayList<TzTransition>
         int             forayIntoNextDay = (int) midnight.until(turnbackTime, ChronoUnit.SECONDS);
 
         if (showWarnings && !warningShown) {
+          int   forayMinutes = forayIntoNextDay / 60;
+          int   foraySeconds = forayIntoNextDay % 60;
           System.out.print("* Warning -- " + zoneId + ": " + before.format(dateTimeFormat) + " rolls back to " + after.format(dateTimeFormat) +
-            " (" + (forayIntoNextDay / 60.0) + " minute foray into next day)");
+            " (" + forayMinutes + " minute" + (foraySeconds > 0 ? ", " + foraySeconds + " second" : "") + " foray into next day)");
           warningShown = true;
         }
 
@@ -309,7 +313,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
     boolean   stillHasRollbacks = false;
 
     if (hasRollbacks && fixRollbacks)
-      stillHasRollbacks = findCalendarRollbacks(false, false);
+      stillHasRollbacks = (findCalendarRollbacks(false, false) == Rollbacks.ROLLBACKS_FOUND);
 
     if (warningShown) {
       if (fixRollbacks) {
@@ -321,10 +325,15 @@ public class TzTransitionList extends ArrayList<TzTransition>
 
       System.out.println();
     }
-    else if (stillHasRollbacks)
-      System.err.println("*** Failed to fix calendar rollbacks in " + zoneId);
 
-    return hasRollbacks;
+    if (!hasRollbacks)
+      return Rollbacks.NO_ROLLBACKS;
+    else if (!fixRollbacks)
+      return Rollbacks.ROLLBACKS_FOUND;
+    else if (stillHasRollbacks)
+      return Rollbacks.ROLLBACKS_REMAIN;
+    else
+      return Rollbacks.ROLLBACKS_REMOVED;
   }
 
   public void removeDuplicateTransitions()
@@ -492,7 +501,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
     List<String>  offsetList = new ArrayList<>();
 
     for (TzTransition t : this) {
-      String  offset = toBase60(t.utcOffset, true) + "/" + toBase60(t.dstOffset, true);
+      String  offset = toBase60(t.utcOffset / 60.0) + "/" + toBase60(t.dstOffset / 60.0);
 
       if (t.name != null && t.name.length() != 0)
         offset += "/" + t.name;
@@ -510,7 +519,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
     sb.append(';');
 
     for (int i = 1; i < size(); ++i)
-      sb.append(toBase60(uniqueOffsetList.indexOf(offsetList.get(i)), false));
+      sb.append(toBase60(uniqueOffsetList.indexOf(offsetList.get(i))));
 
     sb.append(';');
 
@@ -519,7 +528,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
     for (int i = 1; i < size(); ++i) {
       TzTransition  t = get(i);
 
-      sb.append(toBase60(t.time - lastTime, true)).append(' ');
+      sb.append(toBase60((t.time - lastTime) / 60.0)).append(' ');
       lastTime = t.time;
     }
 
@@ -575,7 +584,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
     // Java transition list is likely shorter since it is trimmed off before 1900, and it doesn't
     // contain some transitions like name-only changes. It is possible for Java to have a transition
     // lacking in the compiled transitions where Java includes a transition below the compiler's
-    // one-minute round-off.
+    // optional one-minute round-off.
     //
     // Mostly what we want to find are differences of hours, not days -- it's the hour differences
     // which are most likely to be caused by the zone compilation issues we're looking for.
@@ -628,7 +637,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
   public boolean closelyMatchesZoneinfoTransitions(TzTransitionList fromZoneinfo, boolean roundToMinutes)
   {
     // ZoneInfo transition list might include transitions missing from our compiled transitions because
-    // they're below our one-minute resolution.
+    // they're below the optional one-minute resolution.
     //
     // The ZoneInfo transition list might end sooner, because it's truncated at 2037.
     //
@@ -697,14 +706,15 @@ public class TzTransitionList extends ArrayList<TzTransition>
     return true;
   }
 
-  public void dump(OutputStream out) {
+  public void dump(OutputStream out, boolean roundToMinutes) {
+    //noinspection EmptyCatchBlock
     try {
-      dump(new PrintWriter(new BufferedWriter(new OutputStreamWriter(out, "UTF-8"))));
+      dump(new PrintWriter(new BufferedWriter(new OutputStreamWriter(out, "UTF-8"))), roundToMinutes);
     }
     catch (UnsupportedEncodingException e) {}
   }
 
-  public void dump(PrintWriter out)
+  public void dump(PrintWriter out, boolean roundToMinutes)
   {
     out.println("-------- " + zoneId + " --------");
 
@@ -717,9 +727,10 @@ public class TzTransitionList extends ArrayList<TzTransition>
     }
     else {
       TzTransition  tzt = get(0);
+      int           padding = (roundToMinutes ? 5 : 7);
 
-      out.println("____-__-__ __:__:__ ±____ ±____ --> ____-__-__ __:__:__ " +
-                  formatOffsetNotation(tzt.utcOffset) + " " + formatOffsetNotation(tzt.dstOffset) +
+      out.println("____-__-__ __:__:__ ±____" + (roundToMinutes ? "" : "__") + " ±____ --> ____-__-__ __:__:__ " +
+                  padRight(formatOffsetNotation(tzt.utcOffset), ' ', padding) + " " + formatOffsetNotation(tzt.dstOffset) +
                   (tzt.name != null ? " " + tzt.name : ""));
 
       for (int i = 1; i < size(); ++i) {
@@ -730,8 +741,8 @@ public class TzTransitionList extends ArrayList<TzTransition>
         LocalDateTime   prevDateTime = LocalDateTime.ofEpochSecond(curr.time - 1, 0, prevOffset);
         LocalDateTime   currDateTime = LocalDateTime.ofEpochSecond(curr.time, 0, currOffset);
 
-        out.println(prevDateTime.format(dateTimeFormat) + " " + formatOffsetNotation(prev.utcOffset) + " " + formatOffsetNotation(prev.dstOffset) + " --> " +
-                    currDateTime.format(dateTimeFormat) + " " + formatOffsetNotation(curr.utcOffset) + " " + formatOffsetNotation(curr.dstOffset) +
+        out.println(prevDateTime.format(dateTimeFormat) + " " + padRight(formatOffsetNotation(prev.utcOffset), ' ', padding) + " " + formatOffsetNotation(prev.dstOffset) + " --> " +
+                    currDateTime.format(dateTimeFormat) + " " + padRight(formatOffsetNotation(curr.utcOffset), ' ', padding) + " " + formatOffsetNotation(curr.dstOffset) +
                     (curr.name != null ? " " + curr.name : "") + (curr.dstOffset != 0 ? "*" : ""));
       }
     }

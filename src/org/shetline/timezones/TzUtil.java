@@ -93,10 +93,12 @@ public class TzUtil
     return s;
   }
 
-  public static long fromBase60(String x, boolean multiplyBy60)
+  public static double fromBase60(String x)
   {
-    long  sign = 1;
-    long  result = 0;
+    double    sign = 1;
+    double    result = 0;
+    boolean   inFractionalPart = false;
+    double    power = 1;
 
     if (x.startsWith("-")) {
       sign = -1;
@@ -105,31 +107,28 @@ public class TzUtil
     else if (x.startsWith("+"))
       x = x.substring(1);
 
-    if (multiplyBy60) {
-      int   pos = x.indexOf('.');
-
-      if (pos >= 0) {
-        if (pos == x.length() - 1)
-          x = x.substring(0, pos) + '0';
-        else
-          x = x.substring(0, pos) + x.charAt(pos + 1);
-      }
-      else
-        x += '0';
-    }
-
     for (int i = 0; i < x.length(); ++i) {
       int   digit = x.charAt(i);
 
-      if (digit > 96)
+      if (digit == 46) {
+        inFractionalPart = true;
+        continue;
+      }
+      else if (digit > 96)
         digit -= 87;
       else if (digit > 64)
         digit -= 29;
       else
         digit -= 48;
 
-      result *= 60;
-      result += digit;
+      if (inFractionalPart) {
+        power /= 60;
+        result += power * digit;
+      }
+      else {
+        result *= 60;
+        result += digit;
+      }
     }
 
     return result * sign;
@@ -336,6 +335,16 @@ public class TzUtil
       return s;
 
     return repeat(padChar, finalLength - s.length()) + s;
+  }
+
+  public static String padRight(String s, char padChar, int finalLength)
+  {
+    if (s == null)
+      return null;
+    else if (s.length() >= finalLength)
+      return s;
+
+    return s + repeat(padChar, finalLength - s.length());
   }
 
   public static int[] parseAtTime(String s)
@@ -554,51 +563,75 @@ public class TzUtil
       return 0L;
   }
 
-  public static String toBase60(long x, boolean divideBy60)
+  public static String toBase60(double x)
+  {
+    return toBase60(x, 1);
+  }
+
+  private static char digitValueToChar(int digit)
+  {
+    if (digit < 10)
+      digit += 48;
+    else if (digit < 36)
+      digit += 87;
+    else
+      digit += 29;
+
+    return (char) digit;
+  }
+
+  public static String toBase60(double x, int precision)
   {
     StringBuilder   result = new StringBuilder();
-    long            sign = 1;
+    double          sign = 1;
 
     if (x < 0) {
       x *= -1;
       sign = -1;
     }
 
-    if (x == 0)
+    x += Math.pow(60, -precision) / 2;
+
+    long    whole = (long) Math.floor(x);
+    double  fraction = x - whole;
+
+    if (whole == 0)
       result.append('0');
     else {
-      while (x > 0) {
-        int   digit = (int) (x % 60);
+      while (whole > 0) {
+        int   digit = (int) (whole % 60);
 
-        if (digit < 10)
-          digit += 48;
-        else if (digit < 36)
-          digit += 87;
-        else
-          digit += 29;
+        result.insert(0, digitValueToChar(digit));
+        whole /= 60;
+      }
+    }
 
-        result.insert(0, (char) digit);
+    if (fraction != 0) {
+      result.append('.');
 
-        x /= 60;
+      while (--precision >= 0) {
+        fraction *= 60;
+
+        int   digit = (int) Math.floor(fraction);
+
+        fraction =- digit;
+        result.append(digitValueToChar(digit));
       }
 
-      if (divideBy60) {
-        if (result.length() < 2)
-          result.insert(0, "0.");
-        else
-          result.insert(result.length() - 1, '.');
+      char  lastChar;
+
+      while ((lastChar = result.charAt(result.length() - 1)) == '0' || lastChar == '.') {
+        result.setLength(result.length() - 1);
+
+        if (lastChar == '.')
+          break;
       }
     }
 
     if (sign < 0)
       result.insert(0, '-');
 
-    String  s = result.toString();
-
-    if (divideBy60 && s.endsWith(".0"))
-      s = s.substring(0, s.length() - 2);
-
-    return s;
+    return result.toString();
   }
 
   public static double to_double(String s)
