@@ -208,11 +208,14 @@ public class TzUtil
   {
     long  dayNum = getDayNumber(year, month, minDate);
     int   dayOfWeek = getDayOfWeek(dayNum);
+    int   delta = mod(dayOfTheWeek - dayOfWeek, 7);
 
-    minDate += mod(dayOfTheWeek - dayOfWeek, 7);
+    minDate += delta;
 
+    // If the resultant date is beyond the given month, return AS A NON-POSITIVE NUMBER the number of days
+    // to ADD (so negate the result, THEN add) to the start date.
     if (minDate > getLastDateInMonth(year, month))
-      minDate = 0;
+      minDate = -delta;
 
     return minDate;
   }
@@ -221,11 +224,14 @@ public class TzUtil
   {
     long  dayNum = getDayNumber(year, month, maxDate);
     int   dayOfWeek = getDayOfWeek(dayNum);
+    int   delta = mod(dayOfWeek - dayOfTheWeek, 7);
 
-    maxDate -= mod(dayOfWeek - dayOfTheWeek, 7);
+    maxDate -= delta;
 
-    if (maxDate < 0)
-      maxDate = 0;
+    // If the resultant date is beyond the given month, return AS A NON-POSITIVE NUMBER the number of days
+    // to SUBTRACT (so add the negative number itself) from the start date.
+    if (maxDate <= 0)
+      maxDate = -delta;
 
     return maxDate;
   }

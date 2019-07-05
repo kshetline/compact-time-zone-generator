@@ -127,18 +127,38 @@ public class TzCompiler
     for (TzRule rule : ruleSet) {
       if (rule.startYear <= min(highYear, rule.endYear)) {
         for (int year = max(rule.startYear, 1800); year <= min(highYear, rule.endYear) && year <= maxYear; ++year) {
-          int   date;
+          int   ldtDate;
+          int   ldtMonth = rule.month;
+          int   ldtYear = year;
 
-          if (rule.dayOfWeek >= 0 && rule.dayOfMonth > 0)
-            date = getDayOnOrAfter(year, rule.month, rule.dayOfWeek, rule.dayOfMonth);
-          else if (rule.dayOfWeek >= 0 && rule.dayOfMonth < 0)
-            date = getDayOnOrAfter(year, rule.month, rule.dayOfWeek, -rule.dayOfMonth);
-          else if (rule.dayOfWeek >= 0 && rule.dayOfMonth == 0)
-            date = getDateOfNthWeekdayOfMonth(year, rule.month, rule.dayOfWeek, LAST);
+          if (rule.dayOfWeek >= 0 && rule.dayOfMonth > 0) {
+            ldtDate = getDayOnOrAfter(year, ldtMonth, rule.dayOfWeek, rule.dayOfMonth);
+
+            if (ldtDate <= 0) {
+              int[]   ymd = getDateFromDayNumber(getDayNumber(ldtYear, ldtMonth, rule.dayOfMonth - ldtDate));
+
+              ldtYear = ymd[0];
+              ldtMonth = ymd[1];
+              ldtDate = ymd[2];
+            }
+          }
+          else if (rule.dayOfWeek >= 0 && rule.dayOfMonth < 0) {
+            ldtDate = getDayOnOrBefore(year, ldtMonth, rule.dayOfWeek, -rule.dayOfMonth);
+
+            if (ldtDate <= 0) {
+              int[]   ymd = getDateFromDayNumber(getDayNumber(ldtYear, ldtMonth, rule.dayOfMonth + ldtDate));
+
+              ldtYear = ymd[0];
+              ldtMonth = ymd[1];
+              ldtDate = ymd[2];
+            }
+          }
+          else if (rule.dayOfWeek >= 0)
+            ldtDate = getDateOfNthWeekdayOfMonth(year, ldtMonth, rule.dayOfWeek, LAST);
           else
-            date = rule.dayOfMonth;
+            ldtDate = rule.dayOfMonth;
 
-          LocalDateTime   ldt = LocalDateTime.of(year, rule.month, date, min(rule.atHour, 23), rule.atMinute);
+          LocalDateTime   ldt = LocalDateTime.of(ldtYear, ldtMonth, ldtDate, min(rule.atHour, 23), rule.atMinute);
 
           if (rule.atHour == 24)
             ldt = ldt.plus(1, ChronoUnit.HOURS);
