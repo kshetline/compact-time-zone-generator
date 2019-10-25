@@ -363,7 +363,7 @@ public class CompactTimeZoneGenerator
           else
             firstLine = false;
 
-          out.print("    " + quote + zoneId + quote + ": " + quote + compactTablesByZone.get(zoneId) + quote);
+          out.print("  " + quote + zoneId + quote + ": " + quote + compactTablesByZone.get(zoneId) + quote);
         }
 
         for (String zoneId : duplicateZones) {
@@ -372,7 +372,7 @@ public class CompactTimeZoneGenerator
           else
             firstLine = false;
 
-          out.print("    " + quote + zoneId + quote + ": " + quote + duplicates.get(zoneId) + quote);
+          out.print("  " + quote + zoneId + quote + ": " + quote + duplicates.get(zoneId) + quote);
         }
 
         out.println();
