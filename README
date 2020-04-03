@@ -23,8 +23,10 @@ some other compilers:
   but designators such as +03 or -07 are discarded, to be re-generated as
   needed.
 
-Simply type "make" at a command line prompt while in the top directory to build
-the ctzgenerator.jar JAR file.
+Make sure you have got a JDK (Java Development Kit) installed. If not you can
+install that with `sudo apt install default-jdk`.
+Then simply type "make" at a command line prompt while in the top directory to
+build the ctzgenerator.jar JAR file.
 
 Usage: java -jar ctzgenerator.jar [options] [output_file_name]
 options:
