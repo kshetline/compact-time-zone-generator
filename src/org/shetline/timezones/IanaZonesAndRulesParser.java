@@ -21,6 +21,7 @@ package org.shetline.timezones;
 
 import java.io.*;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 import org.apache.commons.compress.archivers.tar.*;
@@ -30,9 +31,9 @@ import static org.shetline.timezones.TzUtil.*;
 
 public class IanaZonesAndRulesParser
 {
-  private Map<String, IanaZone>   zoneMap = new HashMap<>();
-  private Map<String, String>     zoneAliases = new HashMap<>();
-  private Map<String, TzRuleSet>  ruleSetMap = new HashMap<>();
+  private final Map<String, IanaZone>   zoneMap = new HashMap<>();
+  private final Map<String, String>     zoneAliases = new HashMap<>();
+  private final Map<String, TzRuleSet>  ruleSetMap = new HashMap<>();
 
   private boolean   roundToMinutes = false;
   private boolean   printProgress = false;
@@ -81,6 +82,7 @@ public class IanaZonesAndRulesParser
     TarArchiveEntry           entry;
     Map<String, InputStream>  sources = new HashMap<>();
     String                    tzVersion = null;
+    List<String>              tzSources = new ArrayList<>();
 
     while ((entry = tarIn.getNextTarEntry()) != null) {
       String  sourceName = entry.getName();
@@ -93,18 +95,20 @@ public class IanaZonesAndRulesParser
           System.err.println("*** Error reading " + sourceName + ": " + bytesRead + " != " + fileContent.length);
 
         if ("version".equals(sourceName)) {
-          tzVersion = new String(fileContent, "UTF-8").trim();
+          tzVersion = new String(fileContent, StandardCharsets.UTF_8).trim();
 
           if (printProgress)
             System.out.println("tz database version: " + tzVersion);
         }
         else {
+          tzSources.add(sourceName);
+
           // Uncomment the commented-out time zones in the systemv file
           if ("systemv".equals(sourceName) && includeSystemV) {
-            String  stringContent = new String(fileContent, "UTF-8");
+            String  stringContent = new String(fileContent, StandardCharsets.UTF_8);
 
             stringContent = stringContent.replaceAll("## Zone", "Zone");
-            fileContent = stringContent.getBytes("UTF-8");
+            fileContent = stringContent.getBytes(StandardCharsets.UTF_8);
           }
 
           if (printProgress)
@@ -118,9 +122,37 @@ public class IanaZonesAndRulesParser
     if (printProgress)
       System.out.println("Parsing tz database sources");
 
-    parseSources(TZ_SOURCE_FILES, sources);
+    parseSources(tzSources.toArray(new String[0]), sources);
+
+    // Add aliases if needed for legacy time zones. Not all substitutes exactly duplicate their originals.
+    if (includeSystemV && !tzSources.contains("systemv")) {
+      zoneAliases.put("SystemV/AST4", getRootZone("America/Anguilla"));
+      zoneAliases.put("SystemV/AST4ADT", getRootZone("America/Goose_Bay"));
+      zoneAliases.put("SystemV/CST6", getRootZone("America/Belize"));
+      zoneAliases.put("SystemV/CST6CDT", getRootZone("America/Chicago"));
+      zoneAliases.put("SystemV/EST5", getRootZone("America/Atikokan"));
+      zoneAliases.put("SystemV/EST5EDT", getRootZone("America/New_York"));
+      zoneAliases.put("SystemV/HST10", getRootZone("HST"));
+      zoneAliases.put("SystemV/MST7", getRootZone("America/Creston"));
+      zoneAliases.put("SystemV/MST7MDT", getRootZone("America/Boise"));
+      zoneAliases.put("SystemV/PST8", getRootZone("Etc/GMT+8"));
+      zoneAliases.put("SystemV/PST8PDT", getRootZone("America/Los_Angeles"));
+      zoneAliases.put("SystemV/YST9", getRootZone("Etc/GMT+8"));
+      zoneAliases.put("SystemV/YST9YDT", getRootZone("America/Anchorage"));
+    }
+
+    if (!tzSources.contains("pacificnew"))
+      zoneAliases.put("US/Pacific-New", getRootZone("America/Los_Angeles"));
 
     return tzVersion;
+  }
+
+  private String getRootZone(String zoneId)
+  {
+    while (zoneAliases.containsKey(zoneId))
+      zoneId = zoneAliases.get(zoneId);
+
+    return zoneId;
   }
 
   public void parseSources(String[] sourceNames, Map<String, InputStream> inputStreams) throws IanaParserException
@@ -162,7 +194,7 @@ public class IanaZonesAndRulesParser
 
   private void parseSource(String sourceName, InputStream source) throws IOException, IanaParserException
   {
-    BufferedReader    in = new BufferedReader(new InputStreamReader(source, "UTF-8"));
+    BufferedReader    in = new BufferedReader(new InputStreamReader(source, StandardCharsets.UTF_8));
     String            line;
     IanaZone          zone = null;
     IanaZoneRecord    zoneRec;
