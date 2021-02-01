@@ -687,4 +687,33 @@ public class TzUtil
       return defaultValue;
     }
   }
+
+  public static long to_long(String s)
+  {
+    return to_long(s, 0);
+  }
+
+  public static long to_long(String s, long defaultValue)
+  {
+    if (s != null) {
+      s = s.trim();
+
+      if (s.startsWith("+"))
+        s = s.substring(1);
+    }
+    else
+      s = "";
+
+    try {
+      return Long.parseLong(s);
+    }
+    catch (NumberFormatException e) {
+      try {
+        return (long) Double.parseDouble(s);
+      }
+      catch (NumberFormatException e2) {}
+    }
+
+    return defaultValue;
+  }
 }

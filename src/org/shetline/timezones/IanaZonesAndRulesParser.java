@@ -23,6 +23,7 @@ import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import org.apache.commons.compress.archivers.tar.*;
 
@@ -253,11 +254,18 @@ public class IanaZonesAndRulesParser
     List<String>  zoneIds = new ArrayList<>();
 
     zoneIds.addAll(zoneMap.keySet());
+    zoneIds = zoneIds.stream().map(zone -> "*" + zone).collect(Collectors.toList());
     zoneIds.addAll(zoneAliases.keySet());
 
     Collections.sort(zoneIds);
+    zoneIds = zoneIds.stream().map(zone -> zone.replace("*", "")).collect(Collectors.toList());
 
     return zoneIds;
+  }
+
+  public String getAliasFor(String zoneId)
+  {
+    return zoneAliases.get(zoneId);
   }
 
   public IanaZone getZone(String zoneId)

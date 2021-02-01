@@ -29,7 +29,7 @@ import static org.shetline.timezones.TzUtil.*;
 
 public class TzCompiler
 {
-  private IanaZonesAndRulesParser   parser;
+  private final IanaZonesAndRulesParser   parser;
 
   public TzCompiler(IanaZonesAndRulesParser parser)
   {
@@ -51,6 +51,8 @@ public class TzCompiler
     TzTransitionList        transitions = new TzTransitionList(zoneId);
     ZoneProcessingContext   zpc = new ZoneProcessingContext();
     IanaZone                zone = parser.getZone(zoneId);
+
+    transitions.setAliasFor(parser.getAliasFor(zoneId));
 
     zpc.zoneId = zoneId;
     zpc.lastUtcOffset = 0;

@@ -1,5 +1,5 @@
 /*
-  Copyright © 2018 Kerry Shetline, kerry@shetline.com
+  Copyright © 2018-2021 Kerry Shetline, kerry@shetline.com
 
   MIT license: https://opensource.org/licenses/MIT
 
@@ -20,6 +20,7 @@
 package org.shetline.timezones;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.time.zone.*;
@@ -29,12 +30,12 @@ import java.util.regex.*;
 import static java.lang.Math.abs;
 import static org.shetline.timezones.TzUtil.*;
 
-
 public class TzTransitionList extends ArrayList<TzTransition>
 {
   private String          zoneId = null;
   private IanaZoneRecord  lastZoneRec = null;
   private boolean         fromJava = false;
+  public String           aliasFor = null;
 
   private static final Pattern  systemV = Pattern.compile("SystemV/(\\w\\w\\w)\\d(\\w\\w\\w)");
   private static final int      ZONE_MATCHING_TOLERANCE = 3600 * 24 * 30 * 3; // Three months, in seconds.
@@ -46,6 +47,12 @@ public class TzTransitionList extends ArrayList<TzTransition>
   public TzTransitionList(String zoneId)
   {
     this.zoneId = zoneId;
+  }
+
+  public TzTransitionList(String zoneId, String aliasFor)
+  {
+    this.zoneId = zoneId;
+    this.aliasFor = aliasFor;
   }
 
   private static int conditionallyRoundToMinutes(int seconds, boolean roundToMinutes)
@@ -181,7 +188,7 @@ public class TzTransitionList extends ArrayList<TzTransition>
         while (nameBytes[end] != 0)
           ++end;
 
-        names[i] = new String(nameBytes, index, end - index, "UTF-8");
+        names[i] = new String(nameBytes, index, end - index, StandardCharsets.UTF_8);
       }
 
       for (int i = 0; i < transitionCount; ++i) {
@@ -263,6 +270,14 @@ public class TzTransitionList extends ArrayList<TzTransition>
 
   public String getZoneId() {
     return zoneId;
+  }
+
+  public void setAliasFor(String original) {
+    aliasFor = original;
+  }
+
+  public String getAliasFor() {
+    return aliasFor;
   }
 
   public IanaZoneRecord getLastZoneRec()
@@ -565,6 +580,9 @@ public class TzTransitionList extends ArrayList<TzTransition>
 
       sb.append(';').append(finalStdRule.toCompactTailRule()).append(',').append(finalDstRule.toCompactTailRule());
     }
+
+    if (sb.charAt(sb.length() - 1) == ';')
+      sb.setLength(sb.length() - 1);
 
     return sb.toString();
   }

@@ -1,5 +1,5 @@
 /*
-  Copyright © 2018 Kerry Shetline, kerry@shetline.com
+  Copyright © 2018-2021 Kerry Shetline, kerry@shetline.com
 
   MIT license: https://opensource.org/licenses/MIT
 
@@ -24,6 +24,9 @@ import java.time.zone.ZoneRulesProvider;
 import java.util.*;
 import java.util.regex.*;
 
+import static org.shetline.timezones.TzPopulationAndCountry.appendPopulationAndCountries;
+import static org.shetline.timezones.TzPopulationAndCountry.getPopulation;
+import static org.shetline.timezones.TzPopulationAndCountry.getPopulationAndCountries;
 import static org.shetline.timezones.TzUtil.join;
 import static org.shetline.timezones.TzUtil.to_int;
 
@@ -232,6 +235,8 @@ public class CompactTimeZoneGenerator
     Map<String, String>   compactTablesByZone = new HashMap<>();
     Map<String, TzTransitionList>
                           transitionsByZone = new HashMap<>();
+    Map<String, TzTransitionList>
+                          duplicateTransitionsByZone = new HashMap<>();
     int                   unique = savedZones.size();
     Map<String, String>   duplicates = new HashMap<>();
 
@@ -284,13 +289,37 @@ public class CompactTimeZoneGenerator
 
       if (zonesByCompactTable.containsKey(ctt)) {
         --unique;
-        duplicates.put(zoneId, zonesByCompactTable.get(ctt));
+
+        var oldId = zonesByCompactTable.get(ctt);
+
+        if (getPopulation(oldId) >= getPopulation(zoneId)) {
+          duplicates.put(zoneId, zonesByCompactTable.get(ctt));
+          duplicateTransitionsByZone.put(zoneId, transitions);
+        }
+        else {
+          zonesByCompactTable.put(ctt, zoneId);
+          compactTablesByZone.remove(oldId);
+          transitionsByZone.remove(oldId);
+          compactTablesByZone.put(zoneId, ctt);
+          transitionsByZone.put(zoneId, transitions);
+          duplicates.put(oldId, zoneId);
+          duplicateTransitionsByZone.put(oldId, transitions);
+        }
       }
       else {
         zonesByCompactTable.put(ctt, zoneId);
         compactTablesByZone.put(zoneId, ctt);
         transitionsByZone.put(zoneId, transitions);
       }
+    }
+
+    for (var key : duplicates.keySet()) {
+      var parent = duplicates.get(key);
+
+      while (duplicates.containsKey(parent))
+        parent = duplicates.get(parent);
+
+      duplicates.put(key, parent);
     }
 
     if (validatedWithJava.size() > 0)
@@ -363,7 +392,9 @@ public class CompactTimeZoneGenerator
           else
             firstLine = false;
 
-          out.print("  " + quote + zoneId + quote + ": " + quote + compactTablesByZone.get(zoneId) + quote);
+          var zoneData = appendPopulationAndCountries(compactTablesByZone.get(zoneId), zoneId);
+
+          out.print("  " + quote + zoneId + quote + ": " + quote + zoneData + quote);
         }
 
         for (String zoneId : duplicateZones) {
@@ -372,7 +403,20 @@ public class CompactTimeZoneGenerator
           else
             firstLine = false;
 
-          out.print("  " + quote + zoneId + quote + ": " + quote + duplicates.get(zoneId) + quote);
+          var zoneIdPlus = zoneId;
+          var aliasFor = duplicateTransitionsByZone.containsKey(zoneId) ?
+                duplicateTransitionsByZone.get(zoneId).getAliasFor() : zoneId;
+
+          if (aliasFor == null) {
+            zoneIdPlus += '!';
+
+            var popAndC = getPopulationAndCountries(zoneId);
+
+            if (popAndC != null)
+              zoneIdPlus += ';' + popAndC;
+          }
+
+          out.print("  " + quote + zoneIdPlus + quote + ": " + quote + duplicates.get(zoneId) + quote);
         }
 
         out.println();
