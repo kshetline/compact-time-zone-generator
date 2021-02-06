@@ -403,20 +403,20 @@ public class CompactTimeZoneGenerator
           else
             firstLine = false;
 
-          var zoneIdPlus = zoneId;
+          var original = duplicates.get(zoneId);
           var aliasFor = duplicateTransitionsByZone.containsKey(zoneId) ?
                 duplicateTransitionsByZone.get(zoneId).getAliasFor() : zoneId;
 
           if (aliasFor == null) {
-            zoneIdPlus += '!';
-
             var popAndC = getPopulationAndCountries(zoneId);
 
             if (popAndC != null)
-              zoneIdPlus += ';' + popAndC;
+              original = popAndC.replace(';', ',') + "," + original;
+
+            original = '!' + original;
           }
 
-          out.print("  " + quote + zoneIdPlus + quote + ": " + quote + duplicates.get(zoneId) + quote);
+          out.print("  " + quote + zoneId + quote + ": " + quote + original + quote);
         }
 
         out.println();
